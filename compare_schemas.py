@@ -58,7 +58,7 @@ def compare_regular_columns(table1, table2, table_name, result_text):
         if deleted_columns:
             result_text.insert(tk.END, f"  Deleted Regular Columns: {', '.join(deleted_columns)}\n")
 
-# Function to compare calculated columns between two tables
+
 def compare_calculated_columns(table1, table2, table_name, result_text):
     calculated1 = get_calculated_columns(table1)
     calculated2 = get_calculated_columns(table2)
@@ -81,8 +81,11 @@ def compare_calculated_columns(table1, table2, table_name, result_text):
     calculated1 = {name: column for name, column in calculated1.items() if 'expression' in column or name in changed_calculated or name in deleted_calculated}
     calculated2 = {name: column for name, column in calculated2.items() if 'expression' in column or name in changed_calculated or name in added_calculated}
 
+    # Track if there are any changes
+    has_changes = added_calculated or deleted_calculated or changed_calculated
+
     # Display results only if there are changes
-    if added_calculated or deleted_calculated or changed_calculated:
+    if has_changes:
         result_text.insert(tk.END, f"Table: {table_name}\n")
         
         # Added Calculated Columns
@@ -95,7 +98,8 @@ def compare_calculated_columns(table1, table2, table_name, result_text):
         
         # Changed Calculated Columns
         if changed_calculated:
-            result_text.insert(tk.END, f"  Changed Calculated Columns:\n")
+            # Check if there are actual changes to display
+            has_expression_changes = False
             for name in changed_calculated:
                 old_expr = calculated1[name].get('expression', ['N/A'])
                 new_expr = calculated2[name].get('expression', ['N/A'])
@@ -113,10 +117,33 @@ def compare_calculated_columns(table1, table2, table_name, result_text):
                 
                 # Only display if there are changes
                 if changes:
-                    result_text.insert(tk.END, f"    {name}:\n")
-                    result_text.insert(tk.END, "      Changes:\n")
-                    for change in changes:
-                        result_text.insert(tk.END, f"        {change}\n")
+                    has_expression_changes = True
+                    break
+            
+            # Only show the "Changed Calculated Columns" section if there are changes
+            if has_expression_changes:
+                result_text.insert(tk.END, f"  Changed Calculated Columns:\n")
+                for name in changed_calculated:
+                    old_expr = calculated1[name].get('expression', ['N/A'])
+                    new_expr = calculated2[name].get('expression', ['N/A'])
+                    
+                    # Ensure expressions are lists
+                    old_expr = old_expr if isinstance(old_expr, list) else [old_expr]
+                    new_expr = new_expr if isinstance(new_expr, list) else [new_expr]
+                    
+                    # Use difflib to find the differences
+                    diff = difflib.unified_diff(old_expr, new_expr, lineterm='')
+                    changes = [line for line in diff if line.startswith('-') or line.startswith('+')]
+                    
+                    # Filter out blank lines and markers
+                    changes = [line for line in changes if line.strip() and not line.startswith('---') and not line.startswith('+++')]
+                    
+                    # Only display if there are changes
+                    if changes:
+                        result_text.insert(tk.END, f"    {name}:\n")
+                        result_text.insert(tk.END, "      Changes:\n")
+                        for change in changes:
+                            result_text.insert(tk.END, f"        {change}\n")
 
 # Function to compare measures between two tables
 def compare_measures(table1, table2, table_name, result_text):
@@ -155,7 +182,8 @@ def compare_measures(table1, table2, table_name, result_text):
         
         # Changed Measures
         if changed_measures:
-            result_text.insert(tk.END, f"  Changed Measures:\n")
+            # Check if there are actual changes to display
+            has_changes = False
             for name in changed_measures:
                 old_expr = measures1[name].get('expression', ['N/A'])
                 new_expr = measures2[name].get('expression', ['N/A'])
@@ -173,12 +201,34 @@ def compare_measures(table1, table2, table_name, result_text):
                 
                 # Only display if there are changes
                 if changes:
-                    result_text.insert(tk.END, f"    {name}:\n")
-                    result_text.insert(tk.END, "      Changes:\n")
-                    for change in changes:
-                        result_text.insert(tk.END, f"        {change}\n")
+                    has_changes = True
+                    break
+            
+            # Only show the "Changed Measures" section if there are changes
+            if has_changes:
+                result_text.insert(tk.END, f"  Changed Measures:\n")
+                for name in changed_measures:
+                    old_expr = measures1[name].get('expression', ['N/A'])
+                    new_expr = measures2[name].get('expression', ['N/A'])
+                    
+                    # Ensure expressions are lists
+                    old_expr = old_expr if isinstance(old_expr, list) else [old_expr]
+                    new_expr = new_expr if isinstance(new_expr, list) else [new_expr]
+                    
+                    # Use difflib to find the differences
+                    diff = difflib.unified_diff(old_expr, new_expr, lineterm='')
+                    changes = [line for line in diff if line.startswith('-') or line.startswith('+')]
+                    
+                    # Filter out blank lines and markers
+                    changes = [line for line in changes if line.strip() and not line.startswith('---') and not line.startswith('+++')]
+                    
+                    # Only display if there are changes
+                    if changes:
+                        result_text.insert(tk.END, f"    {name}:\n")
+                        result_text.insert(tk.END, "      Changes:\n")
+                        for change in changes:
+                            result_text.insert(tk.END, f"        {change}\n")
 
-# Function to compare relationships between two models
 # Function to compare relationships between two models
 def compare_relationships(model1, model2, result_text):
     relationships1 = get_relationships(model1)
@@ -204,7 +254,6 @@ def compare_relationships(model1, model2, result_text):
             for key in added_relationships:
                 rel = relationships2[key]
                 result_text.insert(tk.END, f"    {rel['fromTable']}({rel['fromColumn']}) -> {rel['toTable']}({rel['toColumn']})\n")
-                # Do not show isActive flag for added relationships
         
         # Deleted Relationships
         if deleted_relationships:
@@ -212,7 +261,6 @@ def compare_relationships(model1, model2, result_text):
             for key in deleted_relationships:
                 rel = relationships1[key]
                 result_text.insert(tk.END, f"    {rel['fromTable']}({rel['fromColumn']}) -> {rel['toTable']}({rel['toColumn']})\n")
-                # Do not show isActive flag for deleted relationships
         
         # Changed Relationships
         if changed_relationships:
@@ -226,7 +274,6 @@ def compare_relationships(model1, model2, result_text):
                 old_active = old_rel.get('isActive', True)  # Default to True if flag is missing
                 new_active = new_rel.get('isActive', True)  # Default to True if flag is missing
                 
-                # Only show isActive if it has changed
                 if old_active != new_active:
                     if new_active:
                         result_text.insert(tk.END, f"      Relationship is now Active\n")
@@ -256,9 +303,28 @@ def compare_files(file1, file2, result_text):
     for table_name, table1 in tables1.items():
         if table_name in tables2:
             table2 = tables2[table_name]
-            compare_regular_columns(table1, table2, table_name, result_text)
-            compare_calculated_columns(table1, table2, table_name, result_text)
-            compare_measures(table1, table2, table_name, result_text)
+
+            # Track if there are any changes in this table
+            has_changes = False
+
+            # Compare regular columns
+            added_columns, deleted_columns = compare_regular_columns(table1, table2, table_name, result_text)
+            if added_columns or deleted_columns:
+                has_changes = True
+
+            # Compare calculated columns
+            added_calculated, deleted_calculated, changed_calculated = compare_calculated_columns(table1, table2, table_name, result_text)
+            if added_calculated or deleted_calculated or changed_calculated:
+                has_changes = True
+
+            # Compare measures
+            added_measures, deleted_measures, changed_measures = compare_measures(table1, table2, table_name, result_text)
+            if added_measures or deleted_measures or changed_measures:
+                has_changes = True
+
+            # Only display the table header if there are changes
+            if has_changes:
+                result_text.insert(tk.END, f"Table: {table_name}\n")
         else:
             result_text.insert(tk.END, f"Table: {table_name} - Removed in the second file.\n")
 
@@ -270,6 +336,18 @@ def compare_files(file1, file2, result_text):
     # Compare relationships
     compare_relationships(data1['model'], data2['model'], result_text)
 
+# Function to save the output to a text file
+def save_output(result_text):
+    # Ask the user for a file path to save the output
+    file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+    if file_path:
+        try:
+            with open(file_path, 'w', encoding='utf-8') as file:
+                file.write(result_text.get(1.0, tk.END))
+            messagebox.showinfo("Success", f"Output saved to {file_path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save file: {e}")
+
 # Function to open file dialog and set file path
 def select_file(entry_widget):
     file_path = filedialog.askopenfilename(filetypes=[])  # Show all files
@@ -278,10 +356,10 @@ def select_file(entry_widget):
         entry_widget.insert(0, file_path)
 
 # Main GUI application
-class JSONComparatorApp:
+class PBIComparatorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("JSON Comparator")
+        self.root.title("Power BI Comparator")
 
         # Configure grid weights for resizing
         self.root.grid_rowconfigure(3, weight=1)  # Make the result text box row expand
@@ -307,6 +385,10 @@ class JSONComparatorApp:
         self.button_compare = tk.Button(root, text="Compare", command=self.run_comparison)
         self.button_compare.grid(row=2, column=1, padx=5, pady=5)
 
+        # Save Output button
+        self.button_save = tk.Button(root, text="Save Output", command=self.save_output)
+        self.button_save.grid(row=2, column=2, padx=5, pady=5)
+
         # Result display
         self.result_text = scrolledtext.ScrolledText(root, width=80, height=20)
         self.result_text.grid(row=3, column=0, columnspan=3, padx=5, pady=5, sticky="nsew")
@@ -325,8 +407,11 @@ class JSONComparatorApp:
         # Run the comparison
         compare_files(file1, file2, self.result_text)
 
+    def save_output(self):
+        save_output(self.result_text)
+
 # Run the application
 if __name__ == "__main__":
     root = tk.Tk()
-    app = JSONComparatorApp(root)
+    app = PBIComparatorApp(root)
     root.mainloop()
