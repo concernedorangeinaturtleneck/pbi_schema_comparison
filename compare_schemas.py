@@ -2,18 +2,46 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext
 import json
 import difflib
+import zipfile
+import os
+import tempfile
 
-# Function to load JSON data from a file
-def load_json(file_path):
+# Function to extract DataModelSchema from a .pbit file
+def extract_data_model_schema(pbit_path):
     try:
-        with open(file_path, 'r', encoding='utf-16-le') as file:
-            return json.load(file)
-    except FileNotFoundError:
-        messagebox.showerror("Error", f"File '{file_path}' not found.")
+        # Create a temporary directory to extract the .pbit file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Extract the .pbit file
+            with zipfile.ZipFile(pbit_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            # Locate the DataModelSchema file
+            data_model_schema_path = os.path.join(temp_dir, "DataModelSchema")
+            if not os.path.exists(data_model_schema_path):
+                messagebox.showerror("Error", "DataModelSchema file not found in the .pbit file.")
+                return None
+            
+            # Load the DataModelSchema file as JSON
+            with open(data_model_schema_path, 'r', encoding='utf-16-le') as file:
+                return json.load(file)
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to extract or read .pbit file: {e}")
         return None
-    except json.JSONDecodeError:
-        messagebox.showerror("Error", f"File '{file_path}' is not a valid JSON file.")
-        return None
+
+# Function to load JSON data from a file (updated to handle .pbit files)
+def load_json(file_path):
+    if file_path.endswith('.pbit'):
+        return extract_data_model_schema(file_path)
+    else:
+        try:
+            with open(file_path, 'r', encoding='utf-16-le') as file:
+                return json.load(file)
+        except FileNotFoundError:
+            messagebox.showerror("Error", f"File '{file_path}' not found.")
+            return None
+        except json.JSONDecodeError:
+            messagebox.showerror("Error", f"File '{file_path}' is not a valid JSON file.")
+            return None
 
 # Function to extract regular column names from a table
 def get_regular_columns(table):
@@ -304,27 +332,14 @@ def compare_files(file1, file2, result_text):
         if table_name in tables2:
             table2 = tables2[table_name]
 
-            # Track if there are any changes in this table
-            has_changes = False
-
             # Compare regular columns
-            added_columns, deleted_columns = compare_regular_columns(table1, table2, table_name, result_text)
-            if added_columns or deleted_columns:
-                has_changes = True
+            compare_regular_columns(table1, table2, table_name, result_text)
 
             # Compare calculated columns
-            added_calculated, deleted_calculated, changed_calculated = compare_calculated_columns(table1, table2, table_name, result_text)
-            if added_calculated or deleted_calculated or changed_calculated:
-                has_changes = True
+            compare_calculated_columns(table1, table2, table_name, result_text)
 
             # Compare measures
-            added_measures, deleted_measures, changed_measures = compare_measures(table1, table2, table_name, result_text)
-            if added_measures or deleted_measures or changed_measures:
-                has_changes = True
-
-            # Only display the table header if there are changes
-            if has_changes:
-                result_text.insert(tk.END, f"Table: {table_name}\n")
+            compare_measures(table1, table2, table_name, result_text)
         else:
             result_text.insert(tk.END, f"Table: {table_name} - Removed in the second file.\n")
 
@@ -350,7 +365,7 @@ def save_output(result_text):
 
 # Function to open file dialog and set file path
 def select_file(entry_widget):
-    file_path = filedialog.askopenfilename(filetypes=[])  # Show all files
+    file_path = filedialog.askopenfilename(filetypes=[("Power BI Template files", "*.pbit")])  # Filter for .pbit files
     if file_path:
         entry_widget.delete(0, tk.END)
         entry_widget.insert(0, file_path)
